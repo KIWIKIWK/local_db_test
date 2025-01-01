@@ -36,7 +36,7 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Container(
-        child: Text("Awdd"),
+        child: Text("Aw"),
       )
     );
   }
