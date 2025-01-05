@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'model/person.dart';
+
 void main() async {
   await Hive.initFlutter();
+  Hive.registerAdapter(fwefws());
   await Hive.openBox('dataBox');
   runApp(MaterialApp(home: const MyApp()));
 }

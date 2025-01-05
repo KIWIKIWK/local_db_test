@@ -1,0 +1,235 @@
+Hive는 데이터베이스 이긴 하지만 Isar나 Sqlite같은 DB에 비해서는 매우 단순한 형태의 키-값기반 구조의 데이터베이스임.
+그래서 Hive를 사용하기 적합한 용도로는 단순한 로컬캐시나 앱 설정 저장 등의 용도로 사용하는 것이 적합함.
+Shared Preference와 유사하다고 생각됨.
+
+
+1. hive 시작하기
+dependencies:
+  hive: ^[version]
+  hive_flutter: ^[version]
+
+dev_dependencies:
+  hive_generator: ^[version]
+  build_runner: ^[version]
+pubspec.yaml에 위 패키지들 추가 (hive_generator 와 build_runner 는 코드 자동생성기를 위함임)
+
+runApp을 하기전
+
+#initHive
+await Hive.initFlutter();
+
+실행하면 hive를 사용할 준비가 끝남
+
+
+2. Hive의 Box
+공식 문서에는 Hive의 Box는 SQL의 테이블과 유사하다고 되어있지만 Hive의 사용방식을 보면 Box를 열고 안에 데이터를 넣고 읽는 식으로 사용됨.
+테이블보다는 그 하위의 DB와 유사하다고 생각함.
+
+#openBox
+var box = await Hive.openBox(Box이름);
+
+먼저 Hive를 사용하기 전 Box를 열어야함. 사용할 Box이름을 넣고 그 이름이 없다면 그이름에 해당하는 새로운박스가 만들어짐.
+이를 통해 Box이름에 접근할수 있게됨.
+openBox는 Box 타입의 데이터를 반환함. 그렇다고 꼭 변수에 저장해야되는건 아니고 void처럼 사용할 수도 있음.
+
+openBox를 한 이후
+
+#Box
+var box = Hive.box(Box이름);
+
+을 통해 원할때에 box에 접근할 수 있음.
+
+Box를 열때 <>을 이용해서 Box의 데이터들의 타입을 설정해줄수있음.
+직관적인 코드를 위해 매우 유용하다고 생각됨.
+
+var box = await Hive.openBox<T>(Box이름);
+
+Box를 열었으면 닫는 과정이 있는데 데이터가 필요하지 않는 부분에서 Box를 닫아놓으면 메모리가 절약됨.
+꼭 닫아야 하는 것은 아님. 앱이 종료된다면 그전에 알아서 닫힘.
+
+#closeBox
+await box.close();
+
+
+3. Box의 CRUD
+Box는 기본적으로 Json처럼 key값을 통해 데이터를 가져옴. key값은 직접 지정할수도 있고 그렇지 않다면 자체적으로 키값을 생성함. (1,2,3...의 순열)
+공식 문서에서 키값은 255자이하의 문자열이나 부호없는 32비트 정수값을 가진다고 되있음.
+
+#add Data
+box.add(데이터);
+
+add 메소드는 키값을 지정하지 않고 데이터를 저장할 수 있음. 자동으로 키값이 설정됨.
+
+#put Data
+box.put(키,데이터);
+
+put 메소드는 키값을 직접 지정해 데이터를 저장할 수 있음.
+box에는 Box에 저장된 데이터를 수정하는 메소드가 없는데 put메소드를 통해 데이터를 수정할 수 있음.
+
+#get Data
+box.get(키);
+
+get 메소드를 통해 키값에 해당하는 데이터를 가져올 수 있음.
+
+#delete Data
+box.delete(키);
+
+delete 메소드를 통해 키값에 해당하는 데이터를 삭제할 수 있음.
+
+또 Hive에서는 index를 통해 데이터에 접근하는 기능도 있는데
+getAt(), putAt(), deleteAt()
+
+그다지 유용해 보이지는 않음.
+
+4. ValueListenable
+ValueListenableBuilder 을 통해 Riverpod이나 GetX 같은 상태관리 라이브러리들 처럼 Hive에 저장된 데이터가 변하면 위젯이 rebuild 되게 할 수 있음
+
+#ValueListenable box
+ValueListenableBuilder<Box>(
+  valueListenable: Hive.box('settings').listenable(keys: ['firstKey', 'secondKey']),
+  builder: (context, box, widget) {
+    // build widget
+  },
+)
+
+box의 listenable 메소드를 통해 지정된 키값에 해당하는 데이터가 변하는 걸 감지할 수 있음.
+
+tmi)
+Hive의 대부분 메소드는 비동기적으로 수행된다고 하는데 async call을 할 필요는 없다고함.
+메소드가 실행되면 즉각적으로 반영된다고함.
+future 메소드들이 성공적으로 수행됬는지 알고 싶다면 await을 쓰라고함.
+
+
+5. TypeAdapters
+Hive는 기본적으로 List, Map, DateTime, Uint8List를 지원함.
+이 밖에 다른 객체타입의 데이터를 저장하고 싶다면 TypeAdapter 를 등록해야 한다고함.
+
+직접 할 수도 있고 코드 자동생성기를 통해 할 수도 있다고 함.
+
+TypeAdapter를 사용하려면 등록해야한다고 함. 어댑터 인스턴스와 typeId가 필요하고 올바른 어댑터를 찾기 위해 고유한 typeId를 가져야하고
+typeId는 0~223 사이의 값이 허용된다고함.
+
+#register Adapter
+Hive.registerAdapter(MyObjectAdapter());
+
+openBox를 하기전에 모든 TypeAdaptor를 등록하는걸 추천한다고 함.
+
+hive_generator 패키지를 통해 어떤 클래스든 TypeAdapter로 자동으로 만들수 있다고함.
+
+#Adapter Generator
+ex)
+import 'package:hive/hive.dart';
+
+part 'person.g.dart';
+
+@HiveType(typeId: 1)
+class Person {
+  @HiveField(0)
+  String name;
+
+  @HiveField(1)
+  int age;
+
+  @HiveField(2)
+  List<Person> friends;
+
+  Person(this.name, this.age, this.friends);
+}
+
+이후 터미널에서 실행
+dart run build_runner build
+
+freezed 와 유사한 구조를 가졌고 @HiveType(typeId: 1) 을 통해 아까 말한 typeId를 클래스에 지정함.
+클래스의 각 필드에는 @HiveFiled(number)를 달아 줘야함.(typeId와 유사)
+number는 0~255 사이의 값이 될 수 있음.
+
+adapter class가 자동으로 생성되는데 @HiveType의 adapterName 를 통해 설정할 수 도 있음.
+@HiveType(typeId: 1, adapterName: "dasdas")
+
+기존 클래스를 바꾸고 싶은 경우에는 몇가지 규칙이 있음.
+1. 기존 필드의 필드넘버를 바꾸면 안됨.
+2. 필드번호가 동일한 한 필드의 이름을 바꿀 수 있고, private 에서 non-private 또는 그 반대로도 변경 가능
+3. 필드의 타입을 변경하는건 안됨. 새 필드를 만들어야함.
+4. 업데이트된 클래스에서 필드번호가 다시 사용되지 않는 한 필드를 제거할 수 있음.
+
+이런 규칙들이 있는데 수정하고
+dart run build_runner build
+실행하면 알아서 잘 바뀜.
+
+enum 도 위의 클래스와 같이 유사하게 진행됨.
+
+#enum TypeAdaptor
+ex)
+@HiveType(typeId: 2)
+enum HairColor {
+  @HiveField(0)
+  brown,
+
+  @HiveField(1)
+  blond,
+
+  @HiveField(2)
+  black,
+}
+
+enum도 바꾸고 싶으면 위의 규칙이 동일하게 적용됨.
+
+@HiveField의 파라미터 defaultValue를 설정하면 속성과 필드에 기본값을 설정할 수 있음.
+
+enum 도 마찬가지로 기본값 설정 가능하고 defaultValue에 true를 설정하면 그 값이 기본값으로 되고 아무 필드도 설정하지 않았다면
+첫번째 값이 기본값으로 사용됨.
+
+tmi)
+어댑터를 직접 생성할 수 도 있음. 이 경우에는 TypeAdapter 클래스를 상속해 클래스를 정의하면됨.
+근데 직접 생성할 일은 없을 듯.
+
+
+6. HiveObject
+Hive에 커스텀 객체를 저장할때 HiveObject를 상속해 객체들을 쉽게 관리할수 있다고함.
+HiveObject는 save(), delete() 메소드를 제공해주며 key도 제공함.
+
+쿼리를 사용하고 싶으면 HiveObject를 상속받아야함.
+위에서 예시된 Person 클래스에 extend HiveObject를 하면됨.
+
+save와 delete의 사용법은 직접 써보진 않았지만 클래스의 인스턴스를 만들고 그값을 Box에 넣은뒤
+save()를 통해 Box에 저장된 그 인스턴스를 업데이트 할수 있고, delete를 통해 Box에서 없앨 수 있음.
+
+7. Relationships
+class Person extends HiveObject {
+  String name;
+
+  int age;
+
+  List<Person> friends;
+
+  Person(this.name, this.age);
+}
+이런 클래스가 있다고 해보자. friends 속성은 일반적인 List를 사용하는것처럼 사용할수 있지만
+update를 할때에는 복잡할수 있음. Person이 중복하여 저장될수도 있고 저장된 객체가 삭제 되면 일일이 다 직접 삭제 해줘야함.
+
+HiveList를 사용하면 이를 쉽게 할 수 있음.
+ex)
+void main() async {
+  Hive.registerAdapter(PersonAdapter());
+  var persons = await Hive.openBox<Person>('personsWithLists');
+  persons.clear();
+
+  var mario = Person('Mario');
+  var luna = Person('Luna');
+  var alex = Person('Alex');
+  persons.addAll([mario, luna, alex]);
+
+  mario.friends = HiveList(persons); // Create a HiveList
+  mario.friends?.addAll([luna, alex]); // Update Mario's friends
+  mario.save(); // make persistent the change,
+  print(mario.friends);
+
+  luna.delete(); // Remove Luna from Hive
+  print(mario.friends); // HiveList updates automatically
+}
+
+위 예시 코드를 보면 Mario,Luna,Alex 라는 Person 객체를 만들고 그걸 persons 라는 Box에 넣음. HiveList는 box에 현재 존재하는 객체들만 사용할수 있음.
+이후 mario의 friends에 HiveList(persons)를 통해 HiveList 인스턴스를 생성하고 이후 luna와 alex를 추가함.
+그 다음 mario를 save 해준뒤 luna라는 객체를 persons box에서 삭제하면 mario의 friends도 업데이트되서 luna라는 객체가 자동으로 없어짐.
+
+box에서 객체를 지우는 경우 HiveList에 있는 같은 객체도 지워지고 반대로 HiveList에서 지우는 경우 box에는 남아있음.
